@@ -4,6 +4,7 @@
 #include "itkRGBToLuminanceImageFilter.h"
 #include <itkAdditiveGaussianNoiseImageFilter.h>
 #include <itkDiscreteGaussianImageFilter.h>
+#include <itkMedianImageFilter.h>
 
 int main(int argc, char ** argv)
 {
@@ -99,6 +100,47 @@ int main(int argc, char ** argv)
       return EXIT_FAILURE;
     }
   
+  }
+  
+  // Attempt to denoise via a median filter
+  using MedianImageFilterType = itk::MedianImageFilter<GrayScaleImageType, GrayScaleImageType>;
+  MedianImageFilterType::Pointer medianDenoiseFilter = MedianImageFilterType::New();
+  
+  // Let's try some different neighborhood sizes
+  std::vector<int> radii = {1, 2, 7, 12};
+  
+  for (int i=0; i<radii.size(); i++)
+  {
+    
+    GrayScaleImageType::SizeType indexRadius;
+ 
+    indexRadius[0] = radii[i]; // radius along x
+    indexRadius[1] = radii[i]; // radius along y
+    
+    medianDenoiseFilter->SetRadius(indexRadius);
+    medianDenoiseFilter->SetInput(noisyImage);
+    medianDenoiseFilter->Update();
+    
+    // Store the median filter denoised image
+    GrayScaleImageType::Pointer medianDenoisedImage = medianDenoiseFilter->GetOutput();
+    
+    // Write the median filter denoised image
+    char buffer [50];
+    // The size of the neighborhood
+    int N = 2*radii[i]+1;
+    sprintf(buffer, "median_denoised_N_%dx%d.png", N, N);
+    writer->SetFileName(buffer);
+    writer->SetInput(medianDenoisedImage);
+
+    try
+    {
+      writer->Update();
+    }
+    catch (itk::ExceptionObject & error)
+    {
+      std::cerr << "Error: " << error << std::endl;
+      return EXIT_FAILURE;
+    }
   }
     
   return EXIT_SUCCESS;
