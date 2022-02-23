@@ -3,6 +3,7 @@
 #include "itkImageFileWriter.h"
 #include "itkRGBToLuminanceImageFilter.h"
 #include <itkAdditiveGaussianNoiseImageFilter.h>
+#include <itkDiscreteGaussianImageFilter.h>
 
 int main(int argc, char ** argv)
 {
@@ -46,12 +47,13 @@ int main(int argc, char ** argv)
   noiseFilter->SetInput(grayscaleImage);
   noiseFilter->Update();
   
+  // Store the noisy image
   GrayScaleImageType::Pointer noisyImage = noiseFilter->GetOutput();
-
-  // Write the grayscale image
+  
+  // Write the noisy image
   using WriterType = itk::ImageFileWriter<GrayScaleImageType>;
   WriterType::Pointer writer = WriterType::New();
-  writer->SetFileName("test.png");
+  writer->SetFileName("noisy.png");
   writer->SetInput(noisyImage);
 
   try
@@ -64,5 +66,40 @@ int main(int argc, char ** argv)
     return EXIT_FAILURE;
   }
 
+  // Attempt to denoise via a Gaussian filter
+  using GaussianImageFilterType = itk::DiscreteGaussianImageFilter<GrayScaleImageType, GrayScaleImageType>;
+  GaussianImageFilterType::Pointer gaussianDenoiseFilter = GaussianImageFilterType::New();
+  
+  // Let's try some different sigmas
+  std::vector<float> sigmas = {0.25, 1.0, 3.0, 10.0};
+  
+  for (int i=0; i<sigmas.size(); i++)
+  {
+    
+    gaussianDenoiseFilter->SetSigma(sigmas[i]);
+    gaussianDenoiseFilter->SetInput(noisyImage);
+    gaussianDenoiseFilter->Update();
+    
+    // Store the Gaussian denoised image
+    GrayScaleImageType::Pointer gaussianDenoisedImage = gaussianDenoiseFilter->GetOutput();
+    
+    // Write the Gaussian denoised image
+    char buffer [50];
+    sprintf(buffer, "gaussian_denoised_sigma_%0.2f.png", sigmas[i]);
+    writer->SetFileName(buffer);
+    writer->SetInput(gaussianDenoisedImage);
+
+    try
+    {
+      writer->Update();
+    }
+    catch (itk::ExceptionObject & error)
+    {
+      std::cerr << "Error: " << error << std::endl;
+      return EXIT_FAILURE;
+    }
+  
+  }
+    
   return EXIT_SUCCESS;
 }
