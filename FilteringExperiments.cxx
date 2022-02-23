@@ -2,6 +2,7 @@
 #include "itkImageFileReader.h"
 #include "itkImageFileWriter.h"
 #include "itkRGBToLuminanceImageFilter.h"
+#include <itkAdditiveGaussianNoiseImageFilter.h>
 
 int main(int argc, char ** argv)
 {
@@ -27,22 +28,31 @@ int main(int argc, char ** argv)
   
   // Setup the output image type
   using OutputPixelType = unsigned char;
-  using OutputImageType = itk::Image<OutputPixelType, Dimension>;
+  using GrayScaleImageType = itk::Image<OutputPixelType, Dimension>;
   
   // Convert the image to grayscale
-  using FilterType = itk::RGBToLuminanceImageFilter<InputImageType, OutputImageType>;
+  using FilterType = itk::RGBToLuminanceImageFilter<InputImageType, GrayScaleImageType>;
   FilterType::Pointer filter = FilterType::New();
   filter->SetInput(reader->GetOutput());
   filter->Update();
   
   // Store the grayscale image  
-  OutputImageType::Pointer grayscaleImage = filter->GetOutput();
+  GrayScaleImageType::Pointer grayscaleImage = filter->GetOutput();
+  
+  // Add noise via to the grayscale image via the AdditiveGaussianNoiseImageFilter
+  using NoiseFilterType = itk::AdditiveGaussianNoiseImageFilter<GrayScaleImageType, GrayScaleImageType>;
+  NoiseFilterType::Pointer noiseFilter = NoiseFilterType::New();
+  noiseFilter->SetStandardDeviation(50.0);
+  noiseFilter->SetInput(grayscaleImage);
+  noiseFilter->Update();
+  
+  GrayScaleImageType::Pointer noisyImage = noiseFilter->GetOutput();
 
   // Write the grayscale image
-  using WriterType = itk::ImageFileWriter<OutputImageType>;
+  using WriterType = itk::ImageFileWriter<GrayScaleImageType>;
   WriterType::Pointer writer = WriterType::New();
   writer->SetFileName("test.png");
-  writer->SetInput(grayscaleImage);
+  writer->SetInput(noisyImage);
 
   try
   {
